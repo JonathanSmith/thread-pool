@@ -79,13 +79,16 @@
 									   (pool-condition-vars pool-condition-vars)
 									   (jobs jobs))
 							      thread-pool
-							    (when jobs					      
-							      (loop for thr in threads
-								 for thr-cond in pool-condition-vars
-								 for thr-lock in thread-locks
-								 when (and thr (bordeaux-threads:acquire-lock thr-lock nil))
-								 return (progn (bordeaux-threads:condition-notify thr-cond) 
-									       (bordeaux-threads:release-lock thr-lock))))))))))))
+							    (when jobs		
+							      (let ((thrds threads)
+								    (pcnds pool-condition-vars)
+								    (thrlocks thread-locks))
+								(loop for thr in thrds
+								   for thr-cond in pcnds
+								   for thr-lock in thrlocks
+								   when (and thr (bordeaux-threads:acquire-lock thr-lock nil))
+								   return (progn (bordeaux-threads:condition-notify thr-cond) 
+										 (bordeaux-threads:release-lock thr-lock)))))))))))))
 			    (bordeaux-threads:with-lock-held (lock)
 			      (bordeaux-threads:condition-notify pool-condition))
 			    thread))
@@ -108,7 +111,7 @@
 					 do (progn (bordeaux-threads:condition-wait condition lock)
 						   (with-accessors ((pool-lock pool-lock)
 								    (threads threads)
-								    (jbos jobs)
+								    (jobs jobs)
 								    (pool-condition pool-condition))
 						       thread-pool
 						     
@@ -121,7 +124,8 @@
 							 (funcall func))
 						       (bordeaux-threads:with-lock-held (pool-lock)
 							 (setf (nth ix threads) th))
-						       (bordeaux-threads:condition-notify pool-condition)))))
+						       (when func
+							 (bordeaux-threads:condition-notify pool-condition))))))
 				      (bordeaux-threads:condition-notify condition))))))))))
 
 (defmethod stop-pool ((thread-pool thread-pool))
